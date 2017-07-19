@@ -44,7 +44,7 @@ DMA_HandleTypeDef hdma_spi1_rx;
 
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
-uint8_t dataRead[2] = {0,0};
+uint8_t dataRead[3] = {0};
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -99,7 +99,7 @@ int main(void)
 	 		status =  HAL_SPI_Receive(&hspi1, (uint8_t*)data, 1, 5000);
 	 		 HAL_Delay(50);
 	 	  }*/
-	  	  	uint8_t txackbyte = 0x85, rxackbyte = 0x00;
+	  	  	uint8_t txackbyte = 0xba, rxackbyte = 0x00;
  			/*do
 	 	    {
 	 	      if (HAL_SPI_TransmitReceive(&hspi1, (uint8_t *)&txackbyte, (uint8_t *)&rxackbyte, 1, 1000) != HAL_OK)
@@ -111,12 +111,25 @@ int main(void)
 
 //
 	  	  	while(1) {
-	  	  		volatile int i = 0;
+	  	  		/*volatile int i = 0;
 	  	  	    dataRead[0] = 0xff;
 	  	  	    dataRead[1] = 0xff;
-	  	  	    //while(__HAL_SPI_GET_FLAG(&hspi1, SPI_FLAG_RXNE) == RESET);
-	  	  	    while(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_5) == 1);
+	  	  	    while(__HAL_SPI_GET_FLAG(&hspi1, SPI_FLAG_RXNE) == RESET);
+	  	  	    //while(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_5) == 1);
+	  	  		HAL_SPI_TransmitReceive(&hspi1,&txackbyte, dataRead, 1, 5000);
+	  	  		while(__HAL_SPI_GET_FLAG(&hspi1, SPI_FLAG_RXNE) == RESET);
+	  	  		//while(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_5) == 1);
+	  	  		HAL_SPI_Receive(&hspi1, dataRead+1, 1, 5000);
+	  	  		while(__HAL_SPI_GET_FLAG(&hspi1, SPI_FLAG_RXNE) == RESET);
+	  	  		//while(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_5) == 1);
+	  	  		HAL_SPI_Receive(&hspi1, dataRead+2, 1, 5000);
+	  	  		i++;*/
+	  	  		volatile int i = 0;
+	  	  		HAL_SPI_Transmit(&hspi1, &txackbyte, 1, 500);
+	  	  		while(__HAL_SPI_GET_FLAG(&hspi1, SPI_FLAG_RXNE) == RESET);
 	  	  		HAL_SPI_Receive(&hspi1, dataRead, 1, 5000);
+	  	  		while(__HAL_SPI_GET_FLAG(&hspi1, SPI_FLAG_RXNE) == RESET);
+	  	  		HAL_SPI_Receive(&hspi1, dataRead+1, 1, 5000);
 	  	  		i++;
 	  	  	}
 	 	    while(1){
@@ -213,10 +226,10 @@ static void MX_SPI1_Init(void)
 
 }
 
-/** 
+/**
   * Enable DMA controller clock
   */
-static void MX_DMA_Init(void) 
+static void MX_DMA_Init(void)
 {
   /* DMA controller clock enable */
   __HAL_RCC_DMA1_CLK_ENABLE();
