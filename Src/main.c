@@ -49,6 +49,7 @@ uint8_t NEED_WIFI = 0x2;
 uint8_t WIFI_DATA = 0x3;
 uint8_t* Wifissid;
 uint8_t* WifiPw;
+uint8_t data[2];
 const uint8_t ANDROID_THERE = 0x1f;
 const uint8_t NEED = 1;
 const uint8_t XNEED = 0;
@@ -143,7 +144,10 @@ int main(void)
 	  	  			}
 	  	  		}
 	  	  		else if(tempBuffer == WIFI_DATA){
-
+	  	  			Wifissid = receiveWifiSSID();
+	  	  			WifiPw = receiveWifiPw();
+	  	  			volatile int i = 0;
+	  	  			i++;
 	  	  		}
 	  	  		/*Wifissid = receiveWifiSSID();
 	  	  		WifiPw = receiveWifiPw();*/
@@ -285,7 +289,7 @@ void xneedWifiSPI(){
 	HAL_SPI_Transmit(&hspi1, &XNEED, 1, 500);
 }
 uint8_t* receiveWifiSSID(){
-	uint8_t Wifissid [8] = {0};
+	static uint8_t Wifissid [8] = {0};
 	int i;
 	for(i = 0;i<8;i++){
 		while(__HAL_SPI_GET_FLAG(&hspi1, SPI_FLAG_RXNE) == RESET);
@@ -294,12 +298,14 @@ uint8_t* receiveWifiSSID(){
 	return Wifissid;
 }
 uint8_t* receiveWifiPw(){
-	uint8_t WifiPw[8] = {0};
+	static uint8_t WifiPw[8] = {0};
 	int i;
 	for(i = 0;i<8;i++){
 		while(__HAL_SPI_GET_FLAG(&hspi1, SPI_FLAG_RXNE) == RESET);
 		HAL_SPI_Receive(&hspi1, WifiPw+i, 1, 5000);
 	}
+	volatile int j =0;
+	j++;
 	return WifiPw;
 }
 void WriteSsidToEEPROM(uint8_t* Ssid){
