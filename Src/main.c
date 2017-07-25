@@ -45,6 +45,10 @@ DMA_HandleTypeDef hdma_spi1_rx;
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
 uint8_t dataRead[3] = {0};
+const uint8_t NEED_WIFI = 0x2;
+uint8_t* Wifissid;
+uint8_t* WifiPw;
+const uint8_t ANDROID_THERE = 0x1f;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -111,34 +115,21 @@ int main(void)
 
 //
 	  	  	while(1) {
-	  	  		/*volatile int i = 0;
-	  	  	    dataRead[0] = 0xff;
-	  	  	    dataRead[1] = 0xff;
-	  	  	    while(__HAL_SPI_GET_FLAG(&hspi1, SPI_FLAG_RXNE) == RESET);
-	  	  	    //while(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_5) == 1);
-	  	  		HAL_SPI_TransmitReceive(&hspi1,&txackbyte, dataRead, 1, 5000);
-	  	  		while(__HAL_SPI_GET_FLAG(&hspi1, SPI_FLAG_RXNE) == RESET);
-	  	  		//while(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_5) == 1);
-	  	  		HAL_SPI_Receive(&hspi1, dataRead+1, 1, 5000);
-	  	  		while(__HAL_SPI_GET_FLAG(&hspi1, SPI_FLAG_RXNE) == RESET);
-	  	  		//while(HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_5) == 1);
-	  	  		HAL_SPI_Receive(&hspi1, dataRead+2, 1, 5000);
-	  	  		i++;*/
-	  	  		volatile int i = 0;
-	  	  		HAL_SPI_Transmit(&hspi1, &txackbyte, 1, 500);
-	  	  		while(__HAL_SPI_GET_FLAG(&hspi1, SPI_FLAG_RXNE) == RESET);
-	  	  		HAL_SPI_Receive(&hspi1, dataRead, 1, 5000);
-	  	  		while(__HAL_SPI_GET_FLAG(&hspi1, SPI_FLAG_RXNE) == RESET);
-	  	  		HAL_SPI_Receive(&hspi1, dataRead+1, 1, 5000);
-	  	  		i++;
-	  	  	}
-	 	    while(1){
-	 	    volatile int i =0;
-	 	    i++;
-	 	    uint8_t trDATA = 0x8e;
-	 	    HAL_SPI_Transmit(&hspi1, trDATA, 1, 1000);
-	 	    }
+	  	  		while(readAndroidThereNFC() != ANDROID_THERE){
+	  	  			HAL_Delay(50);	//a small delay
+	  	  		}
+	  	  		//send confirmation to spi
+	  	  		//receive ssid and pw from spi
+	  	  		//write ssid and pw to eeprom
+	  	  		//write confirmation byte to eeprom
+	  	  		needWifiSPI();
+	  	  		Wifissid = receiveWifiSSID();
+	  	  		WifiPw = receiveWifiPW();
+	  	  		WriteSsidToEEPROM(Wifissid);
+	  	  		WritePwToEEPROM(WifiPw);
+	  	  		WriteAndroidConfirmationToEEPROM();
 
+	  	  	}
 
 	 	    //HAL_Delay(50);
 	 	    //HAL_SPI_Transmit(&hspi1, &data1, 1, 1000);//overwrite any previous data
@@ -256,6 +247,37 @@ void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi){
 	volatile int i;
 	i++;
 }
+uint8_t readAndroidThereNFC(){
+	return 0xf;
+}
+void needWifiSPI(){
+	HAL_SPI_Transmit(&hspi1, &NEED_WIFI, 1, 500);
+}
+uint8_t* receiveWifiSSID(){
+	uint8_t Wifissid [8] = 0;
+	int i;
+	for(i = 0;i<8;i++){
+		while(__HAL_SPI_GET_FLAG(&hspi1, SPI_FLAG_RXNE) == RESET);
+		HAL_SPI_Receive(&hspi1, Wifissid+i, 1, 5000);
+	}
+	return Wifissid;
+}
+uint8_t* receiveWifiPw(){
+	uint8_t WifiPw[8] = 0;
+	int i;
+	for(i = 0;i<8;i++){
+		while(__HAL_SPI_GET_FLAG(&hspi1, SPI_FLAG_RXNE) == RESET);
+		HAL_SPI_Receive(&hspi1, WifiPw+i, 1, 5000);
+	}
+	return WifiPw;
+}
+void WriteSsidToEEPROM(uint8_t* Ssid){
+}
+void WritePwToEEPROM(uint8_t* Pw){
+}
+void WriteAndroidConfirmationToEEPROM(){
+}
+
 /* USER CODE END 4 */
 
 /**
