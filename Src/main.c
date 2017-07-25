@@ -40,27 +40,36 @@
 
 /* Private variables ---------------------------------------------------------*/
 SPI_HandleTypeDef hspi1;
-DMA_HandleTypeDef hdma_spi1_rx;
 
 /* USER CODE BEGIN PV */
 /* Private variables ---------------------------------------------------------*/
+uint8_t tempBuffer;
 uint8_t dataRead[3] = {0};
-const uint8_t NEED_WIFI = 0x2;
+uint8_t NEED_WIFI = 0x2;
+uint8_t WIFI_DATA = 0x3;
 uint8_t* Wifissid;
 uint8_t* WifiPw;
 const uint8_t ANDROID_THERE = 0x1f;
+const uint8_t NEED = 1;
+const uint8_t XNEED = 0;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 void Error_Handler(void);
 static void MX_GPIO_Init(void);
-static void MX_DMA_Init(void);
 static void MX_SPI1_Init(void);
 
 /* USER CODE BEGIN PFP */
 /* Private function prototypes -----------------------------------------------*/
-
+uint8_t readAndroidThereNFC();
+void needWifiSPI();
+uint8_t* receiveWifiSSID();
+uint8_t* receiveWifiPw();
+void WriteSsidToEEPROM(uint8_t* Ssid);
+void WritePwToEEPROM(uint8_t* Pw);
+void WriteAndroidConfirmationToEEPROM();
+int isAndroidThere();
 /* USER CODE END PFP */
 
 /* USER CODE BEGIN 0 */
@@ -84,7 +93,6 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_DMA_Init();
   MX_SPI1_Init();
 
   /* USER CODE BEGIN 2 */
@@ -103,7 +111,6 @@ int main(void)
 	 		status =  HAL_SPI_Receive(&hspi1, (uint8_t*)data, 1, 5000);
 	 		 HAL_Delay(50);
 	 	  }*/
-	  	  	uint8_t txackbyte = 0xba, rxackbyte = 0x00;
  			/*do
 	 	    {
 	 	      if (HAL_SPI_TransmitReceive(&hspi1, (uint8_t *)&txackbyte, (uint8_t *)&rxackbyte, 1, 1000) != HAL_OK)
@@ -115,19 +122,36 @@ int main(void)
 
 //
 	  	  	while(1) {
-	  	  		while(readAndroidThereNFC() != ANDROID_THERE){
+	  	  		/*while(readAndroidThereNFC() != ANDROID_THERE){
 	  	  			HAL_Delay(50);	//a small delay
-	  	  		}
+	  	  		}*/
 	  	  		//send confirmation to spi
 	  	  		//receive ssid and pw from spi
 	  	  		//write ssid and pw to eeprom
 	  	  		//write confirmation byte to eeprom
-	  	  		needWifiSPI();
-	  	  		Wifissid = receiveWifiSSID();
-	  	  		WifiPw = receiveWifiPW();
-	  	  		WriteSsidToEEPROM(Wifissid);
+
+	  	  		/*SPI teritory*/
+	  	  		//NOTE: default ssid and pw to 8 bytes for simplicity
+	  	  		while(__HAL_SPI_GET_FLAG(&hspi1, SPI_FLAG_RXNE) == RESET);
+	  	  		HAL_SPI_Receive(&hspi1, &tempBuffer, 1, 5000);
+	  	  		if(tempBuffer == NEED_WIFI){
+	  	  			if(isAndroidThere()==0){
+	  	  				needWifiSPI();
+	  	  			}
+	  	  			else{
+	  	  				xneedWifiSPI();
+	  	  			}
+	  	  		}
+	  	  		else if(tempBuffer == WIFI_DATA){
+
+	  	  		}
+	  	  		/*Wifissid = receiveWifiSSID();
+	  	  		WifiPw = receiveWifiPw();*/
+
+	  	  		/*NFC teritory*/
+	  	  		/*WriteSsidToEEPROM(Wifissid);
 	  	  		WritePwToEEPROM(WifiPw);
-	  	  		WriteAndroidConfirmationToEEPROM();
+	  	  		WriteAndroidConfirmationToEEPROM();*/
 
 	  	  	}
 
@@ -205,7 +229,7 @@ static void MX_SPI1_Init(void)
   hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
   hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
-  hspi1.Init.NSS = SPI_NSS_HARD_INPUT;
+  hspi1.Init.NSS = SPI_NSS_SOFT;
   hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -217,28 +241,27 @@ static void MX_SPI1_Init(void)
 
 }
 
-/**
-  * Enable DMA controller clock
-  */
-static void MX_DMA_Init(void)
-{
-  /* DMA controller clock enable */
-  __HAL_RCC_DMA1_CLK_ENABLE();
-
-  /* DMA interrupt init */
-  /* DMA1_Channel2_3_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA1_Channel2_3_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(DMA1_Channel2_3_IRQn);
-
-}
-
-/** Pinout Configuration
+/** Configure pins as 
+        * Analog 
+        * Input 
+        * Output
+        * EVENT_OUT
+        * EXTI
 */
 static void MX_GPIO_Init(void)
 {
 
+  GPIO_InitTypeDef GPIO_InitStruct;
+
   /* GPIO Ports Clock Enable */
+  __HAL_RCC_GPIOC_CLK_ENABLE();
   __HAL_RCC_GPIOA_CLK_ENABLE();
+
+  /*Configure GPIO pin : PushButton_Pin */
+  GPIO_InitStruct.Pin = PushButton_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(PushButton_GPIO_Port, &GPIO_InitStruct);
 
 }
 
@@ -250,11 +273,19 @@ void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi){
 uint8_t readAndroidThereNFC(){
 	return 0xf;
 }
+
+int isAndroidThere(){
+	/*using push button to stimulate the response*/
+	return (HAL_GPIO_ReadPin(PushButton_GPIO_Port, PushButton_Pin));
+}
 void needWifiSPI(){
-	HAL_SPI_Transmit(&hspi1, &NEED_WIFI, 1, 500);
+	HAL_SPI_Transmit(&hspi1, &NEED, 1, 500);
+}
+void xneedWifiSPI(){
+	HAL_SPI_Transmit(&hspi1, &XNEED, 1, 500);
 }
 uint8_t* receiveWifiSSID(){
-	uint8_t Wifissid [8] = 0;
+	uint8_t Wifissid [8] = {0};
 	int i;
 	for(i = 0;i<8;i++){
 		while(__HAL_SPI_GET_FLAG(&hspi1, SPI_FLAG_RXNE) == RESET);
@@ -263,7 +294,7 @@ uint8_t* receiveWifiSSID(){
 	return Wifissid;
 }
 uint8_t* receiveWifiPw(){
-	uint8_t WifiPw[8] = 0;
+	uint8_t WifiPw[8] = {0};
 	int i;
 	for(i = 0;i<8;i++){
 		while(__HAL_SPI_GET_FLAG(&hspi1, SPI_FLAG_RXNE) == RESET);
